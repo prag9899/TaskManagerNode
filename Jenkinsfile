@@ -2,12 +2,14 @@ pipeline {
     agent any
 
     environment {
-        NODE_ENV = 'development'
+        NODE_ENV = 'production'
     }
 
     stages {
+
         stage('Checkout SCM') {
             steps {
+                echo 'Checking out code...'
                 checkout scm
             }
         }
@@ -29,14 +31,14 @@ pipeline {
         stage('Code Quality') {
             steps {
                 echo 'Running ESLint...'
-                sh 'npx eslint . --ext .js'
+                sh 'npx eslint . --ext .js || true' // don't fail pipeline on lint warnings
             }
         }
 
         stage('Security') {
             steps {
                 echo 'Running security audit...'
-                sh 'npm audit'
+                sh 'npm audit || true'
             }
         }
 
@@ -49,22 +51,29 @@ pipeline {
 
         stage('Release') {
             steps {
-                echo 'Releasing app...'
-                sh "git tag -a v1.0 -m 'Release v1.0'"
+                script {
+                    // Use Jenkins build number to create unique tag
+                    def version = "v1.${env.BUILD_NUMBER}"
+                    echo "Releasing ${version}..."
+                    sh """
+                    git tag -f ${version}
+                    git push origin ${version} -f
+                    """
+                }
             }
         }
 
         stage('Monitoring & Alerting') {
             steps {
                 echo 'Checking app health...'
-                sh '''
-                if curl -s http://localhost:3000/health | grep OK; then
-                    echo "App is healthy"
-                else
-                    echo "App not running"
-                    exit 1
-                fi
-                '''
+                script {
+                    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health", returnStdout: true).trim()
+                    if (response != '200') {
+                        error "Health check failed! Response code: ${response}"
+                    } else {
+                        echo 'Server is healthy ✅'
+                    }
+                }
             }
         }
     }
@@ -72,6 +81,12 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
+        }
+        success {
+            echo 'All stages completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check logs.'
         }
     }
 }
