@@ -6,22 +6,27 @@ app.use(bodyParser.json());
 
 let tasks = [];
 
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).send('Server is healthy');
+  res.status(200).send('OK');
 });
 
 // Get all tasks
 app.get('/tasks', (req, res) => {
-  res.json(tasks);
+  res.status(200).json(tasks);
 });
 
 // Add a task
 app.post('/tasks', (req, res) => {
-  const task = req.body;
-  task.id = tasks.length + 1;
+  const task = { id: tasks.length + 1, ...req.body };
   tasks.push(task);
   res.status(201).json(task);
 });
 
-module.exports = app;
+// Basic server start
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+module.exports = app; // For Jest testing

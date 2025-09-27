@@ -1,5 +1,6 @@
 pipeline {
     agent any
+
     environment {
         NODE_ENV = 'development'
     }
@@ -28,14 +29,14 @@ pipeline {
         stage('Code Quality') {
             steps {
                 echo 'Running ESLint...'
-                sh 'npx eslint . --ext .js || true'
+                sh 'npx eslint . --ext .js'
             }
         }
 
         stage('Security') {
             steps {
                 echo 'Running security audit...'
-                sh 'npm audit || true'
+                sh 'npm audit'
             }
         }
 
@@ -49,14 +50,21 @@ pipeline {
         stage('Release') {
             steps {
                 echo 'Releasing app...'
-                sh 'git tag -a v1.0 -m "Release v1.0" || echo "Tag exists"'
+                sh "git tag -a v1.0 -m 'Release v1.0'"
             }
         }
 
         stage('Monitoring & Alerting') {
             steps {
                 echo 'Checking app health...'
-                sh 'curl -s http://localhost:3000 || echo "App not running"'
+                sh '''
+                if curl -s http://localhost:3000/health | grep OK; then
+                    echo "App is healthy"
+                else
+                    echo "App not running"
+                    exit 1
+                fi
+                '''
             }
         }
     }
