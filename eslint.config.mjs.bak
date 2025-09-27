@@ -1,0 +1,14 @@
+// eslint.config.mjs
+import js from "@eslint/js";
+
+export default js.flatConfig({
+  env: {
+    browser: true,
+    node: true,
+    jest: true, // allows Jest globals like describe, it, expect
+  },
+  rules: {
+    // Add any custom rules here
+    "no-console": "off", // allow console.log
+  },
+});
