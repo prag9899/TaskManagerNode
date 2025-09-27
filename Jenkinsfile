@@ -2,10 +2,14 @@ pipeline {
     agent any
 
     environment {
-        NODE_ENV = 'development'
+        NODE_ENV = 'production'
+        APP_NAME = 'taskmanagernode'
+        PORT = '3000'
+        TAG = 'v1.0'
     }
 
     stages {
+
         stage('Checkout SCM') {
             steps {
                 echo 'Checking out code...'
@@ -23,43 +27,40 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                sh 'npx jest'
+                sh 'npx jest --ci --coverage'
             }
         }
 
         stage('Code Quality') {
             steps {
                 echo 'Running ESLint...'
-                sh 'npx eslint . --ext .js || true' // Continue even if lint has warnings
+                sh 'npx eslint . --ext .js'
             }
         }
 
         stage('Security') {
             steps {
                 echo 'Running security audit...'
-                sh 'npm audit || true' // Continue even if audit finds minor issues
+                sh 'npm audit || true'
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying app (demo)...'
-                sh 'echo Deployment completed.'
+                echo 'Deploying app...'
+                sh '''
+                npx pm2 stop $APP_NAME || true
+                npx pm2 start app.js --name $APP_NAME --watch
+                '''
             }
         }
 
         stage('Release') {
             steps {
                 echo 'Releasing app...'
-                // Create tag only if it doesn't already exist
                 sh '''
-                TAG=v1.0
-                if git rev-parse "$TAG" >/dev/null 2>&1; then
-                    echo "Tag $TAG already exists, skipping..."
-                else
-                    git tag -a $TAG -m "Release $TAG"
-                    git push origin $TAG
-                fi
+                git rev-parse $TAG || git tag -a $TAG -m "Release $TAG"
+                git push origin $TAG || echo "Tag already exists"
                 '''
             }
         }
@@ -67,15 +68,19 @@ pipeline {
         stage('Monitoring & Alerting') {
             steps {
                 echo 'Checking app health...'
-                sh 'curl -s http://localhost:3000/health || echo "Health check failed"'
+                sh '''
+                RESPONSE=$(curl -s http://localhost:$PORT/health)
+                if [ "$RESPONSE" != "Server is healthy" ]; then
+                    echo "ALERT: Server health check failed!"
+                    exit 1
+                fi
+                echo "Server is healthy"
+                '''
             }
         }
     }
 
     post {
-        always {
-            echo 'Pipeline finished.'
-        }
         success {
             echo 'Pipeline completed successfully!'
         }
