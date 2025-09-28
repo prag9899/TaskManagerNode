@@ -1,32 +1,46 @@
+require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
 
 const app = express();
-app.use(bodyParser.json());
+app.use(express.json());
 
 let tasks = [];
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
+// Health check
+app.get('/health', (req, res) => res.status(200).send('Server is healthy'));
 
 // Get all tasks
-app.get('/tasks', (req, res) => {
-  res.status(200).json(tasks);
-});
+app.get('/tasks', (req, res) => res.status(200).json(tasks));
 
-// Add a task
+// Add new task
 app.post('/tasks', (req, res) => {
-  const task = { id: tasks.length + 1, ...req.body };
-  tasks.push(task);
-  res.status(201).json(task);
+    const { title, description } = req.body;
+    if (!title || !description) return res.status(400).json({ error: 'Title and description required' });
+    const newTask = { id: tasks.length + 1, title, description };
+    tasks.push(newTask);
+    res.status(201).json(newTask);
 });
 
-// Basic server start
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+let server;
 
-module.exports = app; // For Jest testing
+function startServer(port = process.env.PORT || 3000) {
+    return new Promise((resolve) => {
+        server = app.listen(port, () => {
+            console.log(`Server running on http://localhost:${port}`);
+            resolve(server);
+        });
+    });
+}
+
+function stopServer() {
+    return new Promise((resolve, reject) => {
+        if (!server) return resolve();
+        server.close((err) => {
+            if (err) return reject(err);
+            server = null;
+            resolve();
+        });
+    });
+}
+
+module.exports = { app, startServer, stopServer };
